@@ -114,6 +114,10 @@ async function main() {
       make: 'Honda',
     });
     console.log('Deleted Multiple Cars Count:', deleteManyCarCount);
+
+    const allUser = await squirmy.models.User.findAll();
+
+    console.log('All Users:', allUser);
   } catch (error: any) {
     console.error('Error:', error.message);
   }

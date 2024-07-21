@@ -76,6 +76,42 @@ export default class QueryBuilder<T extends keyof Schema> {
     return row;
   }
 
+  async findAll(
+    options: {
+      where?: WhereClause;
+      orderBy?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<ModelData<T>[]> {
+    const { where = {}, orderBy, limit, offset } = options;
+    let query = `SELECT * FROM "${this.table}"`;
+    const params: any[] = [];
+
+    if (Object.keys(where).length > 0) {
+      const whereConditions = Object.entries(where)
+        .map(([key, value], index) => {
+          params.push(value);
+          return `"${key}" = $${index + 1}`;
+        })
+        .join(' AND ');
+      query += ` WHERE ${whereConditions}`;
+    }
+
+    if (orderBy) {
+      query += ` ORDER BY ${orderBy}`;
+    }
+
+    if (limit) {
+      query += ` LIMIT ${limit}`;
+    }
+
+    if (offset) {
+      query += ` OFFSET ${offset}`;
+    }
+
+    return this.query(query, params);
+  }
   async findById(id: number): Promise<ModelData<T> | null> {
     const [row] = await this.query(
       `SELECT * FROM "${this.table}" WHERE id = $1`,
