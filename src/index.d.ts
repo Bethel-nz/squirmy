@@ -1,8 +1,10 @@
 type SchemaField = string;
 type Relation = {
-  type: 'hasMany' | 'belongsTo';
+  type: 'hasMany' | 'belongsTo' | 'hasOne' | 'manyToMany';
   model: string;
   foreignKey: string;
+  junctionTable?: string; // Add this for manyToMany relations
+  relatedKey?: string; // Add this for manyToMany relations
 };
 type Schema = Record<
   string,
@@ -19,3 +21,9 @@ type ModelData<T extends keyof Schema> = {
 };
 
 type WhereClause = Record<string, any>;
+
+type ManyToManyRelation = Relation & {
+  type: 'manyToMany';
+  junctionTable: string;
+  relatedKey: string;
+};

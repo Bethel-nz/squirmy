@@ -18,6 +18,8 @@ export default class Squirmy {
     this.schema = this.loadSchema(options.schemaPath);
 
     this.models = {};
+    const generatedTypes = this.generateTypesFromSchema();
+    fs.writeFileSync('generated-types.d.ts', generatedTypes);
     this.initializeModels();
   }
 
@@ -29,7 +31,67 @@ export default class Squirmy {
     const schemaContent = fs.readFileSync(fullPath, 'utf-8');
     return JSON.parse(schemaContent);
   }
+  private sqlTypeToTsType(sqlType: string): string {
+    if (
+      sqlType.startsWith('varchar') ||
+      sqlType === 'text' ||
+      sqlType === 'uuid'
+    ) {
+      return 'string';
+    } else if (
+      sqlType === 'int' ||
+      sqlType === 'serial' ||
+      sqlType === 'bigint'
+    ) {
+      return 'number';
+    } else if (sqlType === 'boolean') {
+      return 'boolean';
+    } else if (sqlType === 'date' || sqlType === 'timestamp') {
+      return 'Date';
+    } else if (sqlType === 'json' || sqlType === 'jsonb') {
+      return 'any'; // or 'Record<string, any>' if you prefer
+    } else {
+      return 'any'; // Fallback for unknown types
+    }
+  }
 
+  private generateTypesFromSchema() {
+    const types: string[] = [];
+
+    for (const [modelName, modelSchema] of Object.entries(this.schema)) {
+      const fields = Object.entries(modelSchema.fields)
+        .map(
+          ([fieldName, fieldType]) =>
+            `${fieldName}: ${this.sqlTypeToTsType(fieldType)};`
+        )
+        .join('\n  ');
+
+      const relations = modelSchema.relations
+        ? Object.entries(modelSchema.relations)
+            .map(([relationName, relation]) => {
+              return `${relationName}: { type: '${relation.type}'; model: '${relation.model}'; foreignKey: '${relation.foreignKey}'; };`;
+            })
+            .join('\n    ')
+        : '';
+
+      types.push(`
+            export type ${modelName} = {
+              ${fields}
+              ${relations ? `relations: {\n    ${relations}\n  }` : ''}
+            };
+          `);
+    }
+
+    types.push(`
+        export type ModelTypes = {
+          ${Object.keys(this.schema)
+            .map((modelName) => `${modelName}: ${modelName};`)
+            .join('\n  ')}
+        };
+`);
+
+    return types.join('\n');
+  }
   private initializeModels() {
     for (const modelName in this.schema) {
       this.models[modelName] = new QueryBuilder(

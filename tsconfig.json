@@ -29,6 +29,6 @@
     "typeRoots": ["src/types", "./node_modules/@types"],
     "types": ["node", "bun"]
   },
-  "include": ["src/**/*.ts", "index.ts", "index.d.ts", "index.d.ts"],
+  "include": ["src/**/*.ts", "index.ts", "index.d.ts", "**/*.d.ts"],
   "exclude": ["node_modules", "**/*.spec.ts"]
 }
