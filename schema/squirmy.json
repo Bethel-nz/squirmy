@@ -1,0 +1,20 @@
+{
+  "User": {
+    "fields": {
+      "id": "serial",
+      "name": "varchar(255)",
+      "email": "varchar(255)",
+      "password": "varchar(255)"
+    },
+    "required": ["name", "email", "password"]
+  },
+  "Car": {
+    "fields": {
+      "id": "serial",
+      "make": "varchar(255)",
+      "model": "varchar(255)",
+      "year": "int"
+    },
+    "required": ["make", "model"]
+  }
+}

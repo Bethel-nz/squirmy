@@ -1,0 +1,20 @@
+{
+  "name": "squirmy",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "watch": "tsc -w"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.14.11",
+    "tsx": "^4.16.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@types/pg": "^8.11.6",
+    "pg": "^8.12.0"
+  }
+}
