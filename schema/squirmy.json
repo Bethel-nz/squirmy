@@ -1,20 +1,86 @@
 {
   "User": {
     "fields": {
-      "id": "serial",
-      "name": "varchar(255)",
-      "email": "varchar(255)",
-      "password": "varchar(255)"
+      "id": "uuid",
+      "name": "varchar",
+      "email": "varchar",
+      "password": "varchar",
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp"
     },
-    "required": ["name", "email", "password"]
+    "relations": {
+      "posts": {
+        "type": "hasMany",
+        "model": "Post",
+        "foreignKey": "userId"
+      },
+      "profile": {
+        "type": "hasOne",
+        "model": "Profile",
+        "foreignKey": "userId"
+      },
+      "roles": {
+        "type": "manyToMany",
+        "model": "Role",
+        "foreignKey": "userId",
+        "junctionTable": "UserRoles",
+        "relatedKey": "roleId"
+      }
+    },
+    "required": ["name", "email", "password"],
+    "optional": ["createdAt", "updatedAt"]
   },
-  "Car": {
+  "Post": {
     "fields": {
-      "id": "serial",
-      "make": "varchar(255)",
-      "model": "varchar(255)",
-      "year": "int"
+      "id": "uuid",
+      "title": "varchar",
+      "content": "text",
+      "userId": "uuid",
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp"
     },
-    "required": ["make", "model"]
+    "relations": {
+      "author": {
+        "type": "belongsTo",
+        "model": "User",
+        "foreignKey": "userId"
+      }
+    },
+    "required": ["title", "content", "userId"],
+    "optional": ["createdAt", "updatedAt"]
+  },
+  "Profile": {
+    "fields": {
+      "id": "uuid",
+      "userId": "uuid",
+      "bio": "text",
+      "avatarUrl": "varchar"
+    },
+    "relations": {
+      "user": {
+        "type": "belongsTo",
+        "model": "User",
+        "foreignKey": "userId"
+      }
+    },
+    "required": ["userId"],
+    "optional": ["bio", "avatarUrl"]
+  },
+  "Role": {
+    "fields": {
+      "id": "uuid",
+      "name": "varchar"
+    },
+    "relations": {
+      "users": {
+        "type": "manyToMany",
+        "model": "User",
+        "foreignKey": "roleId",
+        "junctionTable": "UserRoles",
+        "relatedKey": "userId"
+      }
+    },
+    "required": ["name"],
+    "optional": []
   }
 }

@@ -1,12 +1,14 @@
 import { Pool } from 'pg';
-import type { PoolConfig } from 'pg';
+import type { PoolConfig, QueryResult, QueryResultRow } from 'pg';
 import fs from 'fs';
 import path from 'path';
 import QueryBuilder from './QueryBuilder.class';
 
 export default class Squirmy {
   private pool: Pool;
-  public models: Record<string, QueryBuilder<any>>;
+  public models: {
+    [K in keyof ModelTypes]: QueryBuilder<K>;
+  };
   private schema: Schema;
 
   constructor(options: { schemaPath: string; pool: Pool | PoolConfig }) {
@@ -17,9 +19,12 @@ export default class Squirmy {
     }
     this.schema = this.loadSchema(options.schemaPath);
 
-    this.models = {};
+    this.models = {} as {
+      [K in keyof ModelTypes]: QueryBuilder<K>;
+    };
     const generatedTypes = this.generateTypesFromSchema();
-    fs.writeFileSync('generated-types.d.ts', generatedTypes);
+    const typesFilePath = path.join(__dirname, '..', 'index.d.ts');
+    fs.appendFileSync(typesFilePath, '\n\n' + generatedTypes);
     this.initializeModels();
   }
 
@@ -49,14 +54,21 @@ export default class Squirmy {
     } else if (sqlType === 'date' || sqlType === 'timestamp') {
       return 'Date';
     } else if (sqlType === 'json' || sqlType === 'jsonb') {
-      return 'any'; // or 'Record<string, any>' if you prefer
+      return 'any';
     } else {
-      return 'any'; // Fallback for unknown types
+      return 'any';
     }
   }
 
   private generateTypesFromSchema() {
+    console.log('Generating Types from Schema....');
     const types: string[] = [];
+    const typesFilePath = path.join(__dirname, '..', 'index.d.ts');
+    let existingContent = '';
+
+    if (fs.existsSync(typesFilePath)) {
+      existingContent = fs.readFileSync(typesFilePath, 'utf-8');
+    }
 
     for (const [modelName, modelSchema] of Object.entries(this.schema)) {
       const fields = Object.entries(modelSchema.fields)
@@ -74,33 +86,75 @@ export default class Squirmy {
             .join('\n    ')
         : '';
 
-      types.push(`
-            export type ${modelName} = {
-              ${fields}
-              ${relations ? `relations: {\n    ${relations}\n  }` : ''}
-            };
-          `);
+      const typeDefinition = `type ${modelName} = {
+      ${fields}
+      ${relations ? `relations: {\n    ${relations}\n  }` : ''}
+    };`;
+
+      if (!existingContent.includes(`type ${modelName} =`)) {
+        types.push(typeDefinition);
+      }
     }
 
-    types.push(`
-        export type ModelTypes = {
-          ${Object.keys(this.schema)
-            .map((modelName) => `${modelName}: ${modelName};`)
-            .join('\n  ')}
-        };
-`);
+    const modelTypesDefinition = `type ModelTypes = {
+    ${Object.keys(this.schema)
+      .map((modelName) => `${modelName}: ${modelName};`)
+      .join('\n  ')}
+  };`;
 
-    return types.join('\n');
+    if (!existingContent.includes('type ModelTypes =')) {
+      types.push(modelTypesDefinition);
+    }
+
+    if (types.length > 0) {
+      const clearedContent = existingContent.replace(
+        /\/\/ Generated types start[\s\S]*\/\/ Generated types end/,
+        ''
+      );
+
+      const updatedContent = `${clearedContent.trim()}\n\n// Generated types start\n${types.join(
+        '\n\n'
+      )}\n// Generated types end\n`;
+
+      fs.writeFileSync(typesFilePath, updatedContent);
+      console.log('Types generated and written to file.');
+    } else {
+      console.log('No changes in types detected. File not updated.');
+    }
   }
+
+  public async query<T extends QueryResultRow = QueryResultRow>(
+    sql: string,
+    params: any[] = []
+  ): Promise<QueryResult<T>> {
+    try {
+      const result = await this.pool.query<T>(sql, params);
+      return result;
+    } catch (error) {
+      console.error('Error executing custom query:', error);
+      throw error;
+    }
+  }
+  public async dropTables() {
+    for (const modelName in this.schema) {
+      try {
+        const result = await this.query(`DROP TABLE IF EXISTS "${modelName}";`);
+        console.log(`Table "${modelName}" has been deleted successfully.`);
+      } catch (error) {
+        console.error(`Error deleting table "${modelName}":`, error);
+      }
+    }
+  }
+
   private initializeModels() {
     for (const modelName in this.schema) {
-      this.models[modelName] = new QueryBuilder(
+      (this.models as any)[modelName] = new QueryBuilder(
         modelName,
         this.pool,
         this.schema
       );
       Object.defineProperty(this, modelName, {
-        get: () => this.models[modelName],
+        get: () => (this.models as any)[modelName],
       });
     }
   }
