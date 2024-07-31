@@ -1,22 +1,37 @@
 {
   "name": "squirmy",
-  "module": "index.ts",
+  "version": "1.0.0",
+  "description": "A custom ORM for Node.js using PostgreSQL JSON-like schema structure.",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/types/index.d.ts",
   "type": "module",
   "scripts": {
+    "build": "tsc",
     "watch": "tsc -w"
   },
+  "homepage": "https://github.com/Bethel-nz/squirmy/blob/main/README.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bethel-nz/squirmy.git"
+  },
+  "license": "MIT",
+  "author": "Bethel Nzekea",
+  "files": [
+    "dist",
+    "dist/types"
+  ],
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "^20.14.11",
     "tsx": "^4.16.2"
   },
   "peerDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.5.4"
   },
   "dependencies": {
     "@types/pg": "^8.11.6",
     "@types/uuid": "^10.0.0",
-    "crypto": "^1.0.1",
     "pg": "^8.12.0",
     "uuid": "^10.0.0"
   }

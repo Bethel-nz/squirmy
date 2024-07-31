@@ -4,27 +4,16 @@ Squirmy is a lightweight, schema-based ORM for PostgreSQL, built using Node.js a
 
 ## Table of Contents
 
-1. [Installation](#installation)
-2. [Schema Definition](#schema-definition)
-3. [Usage](#usage)
+1. [Schema Definition](#schema-definition)
+2. [Usage](#usage)
    - [Initialization](#initialization)
    - [Model Operations](#model-operations)
      - [Create](#create)
      - [Read](#read)
      - [Update](#update)
      - [Delete](#delete)
-4. [QueryBuilder Class](#querybuilder-class)
-5. [Squirmy Class](#squirmy-class)
-
-## Installation
-
-```bash
-npm install squirmy.js
-
-yarn add squirmy.js
-
-bun i squirmy.js
-```
+3. [QueryBuilder Class](#querybuilder-class)
+4. [Squirmy Class](#squirmy-class)
 
 ## Schema Definition
 
