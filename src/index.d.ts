@@ -8,6 +8,7 @@ type Schema = {
     relations?: {
       [RelationName: string]: Relation;
     };
+    primaryKey: string | string[];
 
     indexes?: Index[];
     required?: string[];
@@ -31,80 +32,20 @@ type InferFieldType<T extends SchemaField> = T extends 'string'
   ? Date
   : never;
 
+type OnDeleteAction = 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+type OnUpdateAction = 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+
 type Relation = {
   type: 'hasMany' | 'belongsTo' | 'hasOne' | 'manyToMany';
   model: string;
   foreignKey: string;
-  junctionTable?: string; // Add this for manyToMany relations
-  relatedKey?: string; // Add this for manyToMany relations
+  junctionTable?: string;
+  relatedKey?: string;
+  references: string | number;
+  onDelete?: OnDeleteAction;
+  onUpdate?: OnUpdateAction;
 };
 
 type ModelData<T extends keyof Schema> = {
   [K in keyof Schema[T]['fields']]: InferModelType<T['fields'][K]>;
 };
-
-
-// Generated types start
-type User = {
-      id: string;
-  name: any;
-  email: any;
-  password: any;
-  createdAt: Date;
-  updatedAt: Date;
-      relations: {
-    posts: { type: 'hasMany'; model: 'Post'; foreignKey: 'userId'; };
-    profile: { type: 'hasOne'; model: 'Profile'; foreignKey: 'userId'; };
-    roles: { type: 'manyToMany'; model: 'Role'; foreignKey: 'userId'; };
-  }
-    };
-
-type Post = {
-      id: string;
-  title: any;
-  content: string;
-  userId: string;
-  createdAt: Date;
-  updatedAt: Date;
-      relations: {
-    author: { type: 'belongsTo'; model: 'User'; foreignKey: 'userId'; };
-  }
-    };
-
-type Profile = {
-      id: string;
-  userId: string;
-  bio: string;
-  avatarUrl: any;
-      relations: {
-    user: { type: 'belongsTo'; model: 'User'; foreignKey: 'userId'; };
-  }
-    };
-
-type Role = {
-      id: string;
-  name: any;
-      relations: {
-    users: { type: 'manyToMany'; model: 'User'; foreignKey: 'roleId'; };
-  }
-    };
-
-type ModelTypes = {
-    User: User;
-  Post: Post;
-  Profile: Profile;
-  Role: Role;
-  };
-// Generated types end
-
-undefined
-
-undefined
-
-undefined
-
-undefined
-
-undefined
-
-undefined

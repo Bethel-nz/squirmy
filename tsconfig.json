@@ -26,9 +26,15 @@
     "declaration": true,
     "declarationDir": "./dist",
     "outDir": "./dist",
-    "typeRoots": ["src/types", "./node_modules/@types"],
+    "typeRoots": ["src/types", "./node_modules/@types", "./src/*"],
     "types": ["node", "bun"]
   },
-  "include": ["src/**/*.ts", "index.ts", "index.d.ts", "**/*.d.ts"],
+  "include": [
+    "src/**/*.ts",
+    "index.ts",
+    "index.d.ts",
+    "**/*.d.ts",
+    "src/types.d.ts"
+  ],
   "exclude": ["node_modules", "**/*.spec.ts"]
 }

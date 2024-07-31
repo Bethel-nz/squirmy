@@ -2,7 +2,9 @@ import { Pool } from 'pg';
 import type { PoolConfig, QueryResult, QueryResultRow } from 'pg';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import QueryBuilder from './QueryBuilder.class';
+import measureExecutionTime from './utils';
 
 export default class Squirmy {
   private pool: Pool;
@@ -22,9 +24,12 @@ export default class Squirmy {
     this.models = {} as {
       [K in keyof ModelTypes]: QueryBuilder<K>;
     };
-    const generatedTypes = this.generateTypesFromSchema();
-    const typesFilePath = path.join(__dirname, '..', 'index.d.ts');
-    fs.appendFileSync(typesFilePath, '\n\n' + generatedTypes);
+    measureExecutionTime(async () =>
+      this.generateTypesFromSchema(options.schemaPath)
+    ).then(([_, time]) => {
+      console.log(`Type generation took ${time} ms`);
+    });
+
     this.initializeModels();
   }
 
@@ -60,14 +65,34 @@ export default class Squirmy {
     }
   }
 
-  private generateTypesFromSchema() {
-    console.log('Generating Types from Schema....');
+  private generateSchemaHash(schema: Schema): string {
+    const hash = crypto.createHash('sha256');
+    hash.update(JSON.stringify(schema));
+    return hash.digest('hex');
+  }
+
+  private async generateTypesFromSchema(schemaPath: string): Promise<void> {
+    console.log('Generating Types from Schema...');
     const types: string[] = [];
-    const typesFilePath = path.join(__dirname, '..', 'index.d.ts');
+    const typesFilePath = path.join(__dirname, '..', 'types.d.ts');
+    const hashFilePath = path.join(path.dirname(schemaPath), 'schema-hash.txt');
+
     let existingContent = '';
+    let existingHash = '';
 
     if (fs.existsSync(typesFilePath)) {
       existingContent = fs.readFileSync(typesFilePath, 'utf-8');
+    }
+
+    if (fs.existsSync(hashFilePath)) {
+      existingHash = fs.readFileSync(hashFilePath, 'utf-8');
+    }
+
+    const currentSchemaHash = this.generateSchemaHash(this.schema);
+
+    if (existingHash === currentSchemaHash) {
+      console.log('No changes in schema detected. Types file not updated.');
+      return;
     }
 
     for (const [modelName, modelSchema] of Object.entries(this.schema)) {
@@ -81,7 +106,15 @@ export default class Squirmy {
       const relations = modelSchema.relations
         ? Object.entries(modelSchema.relations)
             .map(([relationName, relation]) => {
-              return `${relationName}: { type: '${relation.type}'; model: '${relation.model}'; foreignKey: '${relation.foreignKey}'; };`;
+              let relationDef = `${relationName}: { type: '${relation.type}'; model: '${relation.model}'; foreignKey: '${relation.foreignKey}';`;
+              if (relation.onDelete) {
+                relationDef += ` onDelete: '${relation.onDelete}';`;
+              }
+              if (relation.onUpdate) {
+                relationDef += ` onUpdate: '${relation.onUpdate}';`;
+              }
+              relationDef += ' };';
+              return relationDef;
             })
             .join('\n    ')
         : '';
@@ -91,9 +124,7 @@ export default class Squirmy {
       ${relations ? `relations: {\n    ${relations}\n  }` : ''}
     };`;
 
-      if (!existingContent.includes(`type ${modelName} =`)) {
-        types.push(typeDefinition);
-      }
+      types.push(typeDefinition);
     }
 
     const modelTypesDefinition = `type ModelTypes = {
@@ -102,27 +133,16 @@ export default class Squirmy {
       .join('\n  ')}
   };`;
 
-    if (!existingContent.includes('type ModelTypes =')) {
-      types.push(modelTypesDefinition);
-    }
+    types.push(modelTypesDefinition);
 
-    if (types.length > 0) {
-      const clearedContent = existingContent.replace(
-        /\/\/ Generated types start[\s\S]*\/\/ Generated types end/,
-        ''
-      );
+    const updatedContent = `// Generated types start\n${types.join(
+      '\n\n'
+    )}\n// Generated types end\n`;
 
-      const updatedContent = `${clearedContent.trim()}\n\n// Generated types start\n${types.join(
-        '\n\n'
-      )}\n// Generated types end\n`;
-
-      fs.writeFileSync(typesFilePath, updatedContent);
-      console.log('Types generated and written to file.');
-    } else {
-      console.log('No changes in types detected. File not updated.');
-    }
+    fs.writeFileSync(typesFilePath, updatedContent);
+    fs.writeFileSync(hashFilePath, currentSchemaHash);
+    console.log('Types generated and written to file.');
   }
-
   public async query<T extends QueryResultRow = QueryResultRow>(
     sql: string,
     params: any[] = []
@@ -138,12 +158,15 @@ export default class Squirmy {
   public async dropTables() {
     for (const modelName in this.schema) {
       try {
-        const result = await this.query(`DROP TABLE IF EXISTS "${modelName}";`);
+        const result = await this.query(
+          `DROP TABLE IF EXISTS "${modelName}" CASCADE;`
+        );
         console.log(`Table "${modelName}" has been deleted successfully.`);
       } catch (error) {
         console.error(`Error deleting table "${modelName}":`, error);
       }
     }
+    return `Tables in ${Object.keys(this.schema).join(', ')} deleted`;
   }
 
   private initializeModels() {
@@ -156,6 +179,16 @@ export default class Squirmy {
       Object.defineProperty(this, modelName, {
         get: () => (this.models as any)[modelName],
       });
+    }
+  }
+
+  public async close(): Promise<void> {
+    try {
+      await this.pool.end();
+      console.log('Database connection pool closed successfully.');
+    } catch (error) {
+      console.error('Error closing the database connection pool:', error);
+      throw error;
     }
   }
 }

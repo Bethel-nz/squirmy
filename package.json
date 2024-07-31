@@ -16,6 +16,7 @@
   "dependencies": {
     "@types/pg": "^8.11.6",
     "@types/uuid": "^10.0.0",
+    "crypto": "^1.0.1",
     "pg": "^8.12.0",
     "uuid": "^10.0.0"
   }

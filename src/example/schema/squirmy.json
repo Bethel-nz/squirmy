@@ -1,0 +1,202 @@
+{
+  "User": {
+    "fields": {
+      "id": "uuid",
+      "name": "varchar",
+      "email": "varchar",
+      "password": "varchar",
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp"
+    },
+    "relations": {
+      "posts": {
+        "type": "hasMany",
+        "model": "Post",
+        "foreignKey": "userid",
+        "references": "id"
+      },
+      "profile": {
+        "type": "hasOne",
+        "model": "Profile",
+        "foreignKey": "userid",
+        "references": "id"
+      },
+      "roles": {
+        "type": "manyToMany",
+        "model": "Role",
+        "foreignKey": "userid",
+        "junctionTable": "UserRoles",
+        "relatedKey": "roleId",
+        "references": "id"
+      }
+    },
+    "required": ["id", "name", "email", "password"],
+    "optional": ["createdAt", "updatedAt"],
+    "primaryKey": "id"
+  },
+  "Post": {
+    "fields": {
+      "id": "uuid",
+      "title": "varchar",
+      "content": "text",
+      "userid": "uuid",
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp"
+    },
+    "relations": {
+      "author": {
+        "type": "belongsTo",
+        "model": "User",
+        "foreignKey": "userid",
+        "references": "id"
+      },
+      "comments": {
+        "type": "hasMany",
+        "model": "Comment",
+        "foreignKey": "postId",
+        "references": "id"
+      },
+      "tags": {
+        "type": "manyToMany",
+        "model": "Tag",
+        "foreignKey": "postId",
+        "junctionTable": "PostTags",
+        "relatedKey": "tagId",
+        "references": "id"
+      }
+    },
+    "required": ["id", "title", "content", "userid"],
+    "optional": ["createdAt", "updatedAt"],
+    "primaryKey": "id"
+  },
+  "Profile": {
+    "fields": {
+      "id": "uuid",
+      "userid": "uuid",
+      "bio": "text",
+      "avatarUrl": "varchar"
+    },
+    "relations": {
+      "user": {
+        "type": "belongsTo",
+        "model": "User",
+        "foreignKey": "userid",
+        "references": "id"
+      }
+    },
+    "required": ["id", "userid"],
+    "optional": ["bio", "avatarUrl"],
+    "primaryKey": "id"
+  },
+  "Role": {
+    "fields": {
+      "id": "uuid",
+      "name": "varchar"
+    },
+    "relations": {
+      "users": {
+        "type": "manyToMany",
+        "model": "User",
+        "foreignKey": "roleId",
+        "junctionTable": "UserRoles",
+        "relatedKey": "userid",
+        "references": "id"
+      }
+    },
+    "required": ["id", "name"],
+    "optional": [],
+    "primaryKey": "id"
+  },
+  "Comment": {
+    "fields": {
+      "id": "uuid",
+      "content": "text",
+      "postId": "uuid",
+      "userid": "uuid",
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp"
+    },
+    "relations": {
+      "post": {
+        "type": "belongsTo",
+        "model": "Post",
+        "foreignKey": "postId",
+        "references": "id"
+      },
+      "author": {
+        "type": "belongsTo",
+        "model": "User",
+        "foreignKey": "userid",
+        "references": "id"
+      }
+    },
+    "required": ["id", "content", "postId", "userid"],
+    "optional": ["createdAt", "updatedAt"],
+    "primaryKey": "id"
+  },
+  "Tag": {
+    "fields": {
+      "id": "uuid",
+      "name": "varchar"
+    },
+    "relations": {
+      "posts": {
+        "type": "manyToMany",
+        "model": "Post",
+        "foreignKey": "tagId",
+        "junctionTable": "PostTags",
+        "relatedKey": "postId",
+        "references": "id"
+      }
+    },
+    "required": ["id", "name"],
+    "optional": [],
+    "primaryKey": "id"
+  },
+  "UserRoles": {
+    "fields": {
+      "userid": "uuid",
+      "roleId": "uuid"
+    },
+    "relations": {
+      "user": {
+        "type": "belongsTo",
+        "model": "User",
+        "foreignKey": "userid",
+        "references": "id"
+      },
+      "role": {
+        "type": "belongsTo",
+        "model": "Role",
+        "foreignKey": "roleId",
+        "references": "id"
+      }
+    },
+    "required": ["userid", "roleId"],
+    "optional": [],
+    "primaryKey": ["userid", "roleId"]
+  },
+  "PostTags": {
+    "fields": {
+      "postId": "uuid",
+      "tagId": "uuid"
+    },
+    "relations": {
+      "post": {
+        "type": "belongsTo",
+        "model": "Post",
+        "foreignKey": "postId",
+        "references": "id"
+      },
+      "tag": {
+        "type": "belongsTo",
+        "model": "Tag",
+        "foreignKey": "tagId",
+        "references": "id"
+      }
+    },
+    "required": ["postId", "tagId"],
+    "optional": [],
+    "primaryKey": ["postId", "tagId"]
+  }
+}

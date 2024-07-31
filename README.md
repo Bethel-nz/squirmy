@@ -19,16 +19,16 @@ Squirmy is a lightweight, schema-based ORM for PostgreSQL, built using Node.js a
 ## Installation
 
 ```bash
-npm install
+npm install squirmy.js
 
-yarn
+yarn add squirmy.js
 
-bun i
+bun i squirmy.js
 ```
 
 ## Schema Definition
 
-The schema is defined in a JSON file. Each table is represented by an object with fields, relations, required, and optional properties.
+The schema is defined in a JSON file. Each table is represented by an object with fields, relations, required, and optional properties. Squirmy follows a PostgreSQL JSON-like schema structure.
 
 Example schema (schema/squirmy.json):
 
@@ -36,21 +36,203 @@ Example schema (schema/squirmy.json):
 {
   "User": {
     "fields": {
-      "id": "serial",
-      "name": "varchar(255)",
-      "email": "varchar(255)",
-      "password": "varchar(255)"
+      "id": "uuid",
+      "name": "varchar",
+      "email": "varchar",
+      "password": "varchar",
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp"
     },
-    "required": ["name", "email", "password"]
+    "relations": {
+      "posts": {
+        "type": "hasMany",
+        "model": "Post",
+        "foreignKey": "userid",
+        "references": "id"
+      },
+      "profile": {
+        "type": "hasOne",
+        "model": "Profile",
+        "foreignKey": "userid",
+        "references": "id"
+      },
+      "roles": {
+        "type": "manyToMany",
+        "model": "Role",
+        "foreignKey": "userid",
+        "junctionTable": "UserRoles",
+        "relatedKey": "roleId",
+        "references": "id"
+      }
+    },
+    "required": ["id", "name", "email", "password"],
+    "optional": ["createdAt", "updatedAt"],
+    "primaryKey": "id"
   },
-  "Car": {
+  "Post": {
     "fields": {
-      "id": "serial",
-      "make": "varchar(255)",
-      "model": "varchar(255)",
-      "year": "int"
+      "id": "uuid",
+      "title": "varchar",
+      "content": "text",
+      "userid": "uuid",
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp"
     },
-    "required": ["make", "model", "year"]
+    "relations": {
+      "author": {
+        "type": "belongsTo",
+        "model": "User",
+        "foreignKey": "userid",
+        "references": "id"
+      },
+      "comments": {
+        "type": "hasMany",
+        "model": "Comment",
+        "foreignKey": "postId",
+        "references": "id"
+      },
+      "tags": {
+        "type": "manyToMany",
+        "model": "Tag",
+        "foreignKey": "postId",
+        "junctionTable": "PostTags",
+        "relatedKey": "tagId",
+        "references": "id"
+      }
+    },
+    "required": ["id", "title", "content", "userid"],
+    "optional": ["createdAt", "updatedAt"],
+    "primaryKey": "id"
+  },
+  "Profile": {
+    "fields": {
+      "id": "uuid",
+      "userid": "uuid",
+      "bio": "text",
+      "avatarUrl": "varchar"
+    },
+    "relations": {
+      "user": {
+        "type": "belongsTo",
+        "model": "User",
+        "foreignKey": "userid",
+        "references": "id"
+      }
+    },
+    "required": ["id", "userid"],
+    "optional": ["bio", "avatarUrl"],
+    "primaryKey": "id"
+  },
+  "Role": {
+    "fields": {
+      "id": "uuid",
+      "name": "varchar"
+    },
+    "relations": {
+      "users": {
+        "type": "manyToMany",
+        "model": "User",
+        "foreignKey": "roleId",
+        "junctionTable": "UserRoles",
+        "relatedKey": "userid",
+        "references": "id"
+      }
+    },
+    "required": ["id", "name"],
+    "optional": [],
+    "primaryKey": "id"
+  },
+  "Comment": {
+    "fields": {
+      "id": "uuid",
+      "content": "text",
+      "postId": "uuid",
+      "userid": "uuid",
+      "createdAt": "timestamp",
+      "updatedAt": "timestamp"
+    },
+    "relations": {
+      "post": {
+        "type": "belongsTo",
+        "model": "Post",
+        "foreignKey": "postId",
+        "references": "id"
+      },
+      "author": {
+        "type": "belongsTo",
+        "model": "User",
+        "foreignKey": "userid",
+        "references": "id"
+      }
+    },
+    "required": ["id", "content", "postId", "userid"],
+    "optional": ["createdAt", "updatedAt"],
+    "primaryKey": "id"
+  },
+  "Tag": {
+    "fields": {
+      "id": "uuid",
+      "name": "varchar"
+    },
+    "relations": {
+      "posts": {
+        "type": "manyToMany",
+        "model": "Post",
+        "foreignKey": "tagId",
+        "junctionTable": "PostTags",
+        "relatedKey": "postId",
+        "references": "id"
+      }
+    },
+    "required": ["id", "name"],
+    "optional": [],
+    "primaryKey": "id"
+  },
+  "UserRoles": {
+    "fields": {
+      "userid": "uuid",
+      "roleId": "uuid"
+    },
+    "relations": {
+      "user": {
+        "type": "belongsTo",
+        "model": "User",
+        "foreignKey": "userid",
+        "references": "id"
+      },
+      "role": {
+        "type": "belongsTo",
+        "model": "Role",
+        "foreignKey": "roleId",
+        "references": "id"
+      }
+    },
+    "required": ["userid", "roleId"],
+    "optional": [],
+    "primaryKey": ["userid", "roleId"]
+  },
+  "PostTags": {
+    "fields": {
+      "postId": "uuid",
+      "tagId": "uuid"
+    },
+    "relations": {
+      "post": {
+        "type": "belongsTo",
+        "model": "Post",
+        "foreignKey": "postId",
+        "references": "id"
+      },
+      "tag": {
+        "type": "belongsTo",
+        "model": "Tag",
+        "foreignKey": "tagId",
+        "references": "id"
+      }
+    },
+    "required": ["postId", "tagId"],
+    "optional": [],
+    "primaryKey": ["postId", "tagId"]
   }
 }
 ```
@@ -153,12 +335,14 @@ console.log('Deleted User:', deletedUser);
 
 To delete multiple records:
 
-```typescript
+````typescript
 const deleteManyCount = await squirmy.models.User.deleteMany({
   email: 'john@example.com',
 });
 console.log('Deleted Multiple Users Count:', deleteManyCount);
-```
+``
+
+`
 
 ## QueryBuilder Class
 
@@ -168,7 +352,7 @@ The `QueryBuilder` class provides methods for interacting with a PostgreSQL data
 
 ```typescript
 constructor(table: T, pool: Pool, schema: Schema)
-```
+````
 
 **Parameters:**
 
@@ -337,186 +521,60 @@ Deletes multiple records that match the specified conditions.
 - `data` (Partial<ModelData<T>>): The data to validate.
 
 **Description:**
-Validates the data against the schema, ensuring required fields are present and no invalid fields are included.
+Validates the provided data against the schema.
+
+---
+
+#### `private processFields(data: Partial<ModelData<T>>): Record<string, any>`
+
+**Parameters:**
+
+- `data` (Partial<ModelData<T>>): The data to process.
+
+**Returns:**
+
+- `Record<string, any>`: The processed data.
+
+**Description:**
+Processes and formats the fields according to their types.
 
 ---
 
 ## Squirmy Class
 
-The `Squirmy` class initializes models based on a provided schema and manages the connection pool for interacting with the PostgreSQL database.
+The `Squirmy` class initializes and provides access to all models defined in the schema. It handles the creation of `QueryBuilder` instances for each model and manages database connections.
 
 ### Constructor
 
 ```typescript
-constructor(options: { schemaPath: string; pool: Pool | PoolConfig })
+constructor(options: { schemaPath: string; pool: PoolConfig })
 ```
 
 **Parameters:**
 
 - `options` (object):
-  - `schemaPath` (string): The path to the schema JSON file.
-  - `pool` (Pool | PoolConfig): The PostgreSQL connection pool or configuration object.
+  - `schemaPath` (string): The path to the schema definition file.
+  - `pool` (PoolConfig): PostgreSQL connection options.
 
 **Description:**
-Initializes the `Squirmy` instance with the provided schema path and connection pool.
+Initializes Squirmy with the provided schema path and database connection options.
 
 ### Methods
 
-#### `private loadSchema(schemaPath: string): Schema`
+#### `async initialize(): Promise<void>`
 
-**Parameters:**
+**Description:**
+Initializes the ORM by reading the schema and setting up the models.
 
-- `schemaPath` (
-
-string): The path to the schema JSON file.
+#### `get models(): Record<string, QueryBuilder<any>>`
 
 **Returns:**
 
-- `Schema`: The parsed schema object.
+- `Record<string, QueryBuilder<any>>`: An object containing the models.
 
 **Description:**
-Loads and parses the schema from the specified file.
+Returns an object containing the models, which can be used to interact with the database.
 
 ---
 
-#### `private createModels(schema: Schema): void`
-
-**Parameters:**
-
-- `schema` (Schema): The schema object.
-
-**Description:**
-Creates models based on the provided schema.
-
----
-
-### Example
-
-```typescript
-import Squirmy from './src/squirmy';
-
-const squirmy = new Squirmy({
-  schemaPath: './schema/squirmy.json',
-  pool: {
-    user: 'postgres',
-    password: '5437',
-    database: 'squirmy-db',
-    host: 'localhost',
-    port: 5437,
-  },
-});
-
-async function main() {
-  try {
-    console.log('Available Models:', Object.keys(squirmy.models));
-
-    if (!squirmy.models.User || !squirmy.models.Car) {
-      throw new Error('User or Car model is not available');
-    }
-
-    // Create a new user
-    const newUser = await squirmy.models.User.create({
-      name: 'John Doe',
-      email: 'john@example.com',
-      password: 'hashedpassword',
-    });
-    console.log('Created User:', newUser);
-
-    // Find user by ID
-    const userById = await squirmy.models.User.findById(newUser.id);
-    console.log('Found User by ID:', userById);
-
-    // Find one user by criteria
-    const userByEmail = await squirmy.models.User.findOne({
-      email: 'john@example.com',
-    });
-    console.log('Found User by Email:', userByEmail);
-
-    // Update user
-    const updatedUser = await squirmy.models.User.update(newUser.id, {
-      name: 'Jane Doe',
-    });
-    console.log('Updated User:', updatedUser);
-
-    // Create another user
-    const anotherUser = await squirmy.models.User.create({
-      name: 'Alice Smith',
-      email: 'alice@example.com',
-      password: 'anotherpassword',
-    });
-    console.log('Created Another User:', anotherUser);
-
-    // Update multiple users
-    const updatedCount = await squirmy.models.User.updateMany(
-      { email: 'alice@example.com' },
-      { name: 'Alice Johnson' }
-    );
-    console.log('Updated Multiple Users Count:', updatedCount);
-
-    // Delete a user
-    const deletedUser = await squirmy.models.User.delete(newUser.id);
-    console.log('Deleted User:', deletedUser);
-
-    // Delete multiple users
-    const deleteManyCount = await squirmy.models.User.deleteMany({
-      email: 'alice@example.com',
-    });
-    console.log('Deleted Multiple Users Count:', deleteManyCount);
-
-    // Create a new car
-    const newCar = await squirmy.models.Car.create({
-      make: 'Toyota',
-      model: 'Corolla',
-      year: 2020,
-    });
-    console.log('Created Car:', newCar);
-
-    // Find car by ID
-    const carById = await squirmy.models.Car.findById(newCar.id);
-    console.log('Found Car by ID:', carById);
-
-    // Find one car by criteria
-    const carByModel = await squirmy.models.Car.findOne({ model: 'Corolla' });
-    console.log('Found Car by Model:', carByModel);
-
-    // Update car
-    const updatedCar = await squirmy.models.Car.update(newCar.id, {
-      model: 'Camry',
-    });
-    console.log('Updated Car:', updatedCar);
-
-    // Create another car
-    const anotherCar = await squirmy.models.Car.create({
-      make: 'Honda',
-      model: 'Civic',
-      year: 2018,
-    });
-    console.log('Created Another Car:', anotherCar);
-
-    // Update multiple cars
-    const updatedCarCount = await squirmy.models.Car.updateMany(
-      { make: 'Honda' },
-      { year: 2019 }
-    );
-    console.log('Updated Multiple Cars Count:', updatedCarCount);
-
-    // Delete a car
-    const deletedCar = await squirmy.models.Car.delete(newCar.id);
-    console.log('Deleted Car:', deletedCar);
-
-    // Delete multiple cars
-    const deleteManyCarCount = await squirmy.models.Car.deleteMany({
-      make: 'Honda',
-    });
-    console.log('Deleted Multiple Cars Count:', deleteManyCarCount);
-
-    //Gets all Users
-    const allUser = await squirmy.models.User.findAll();
-    console.log('All Users:', allUser);
-  } catch (error: any) {
-    console.error('Error:', error.message);
-  }
-}
-
-main();
-```
+This document provides an overview of Squirmy ORM, including installation, schema definition, usage, and the main classes and methods available.

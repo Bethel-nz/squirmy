@@ -20,7 +20,7 @@ export default class QueryBuilder<T extends keyof Schema> {
     this.optional = schema[table].optional || [];
   }
 
-  private async query(sql: string, params: any[] = []): Promise<any[]> {
+  async query(sql: string, params: any[] = []): Promise<any[]> {
     try {
       const { rows } = await this.pool.query(sql, params);
       return rows;
@@ -30,38 +30,124 @@ export default class QueryBuilder<T extends keyof Schema> {
     }
   }
 
+  private sqlTypeFromSchemaType(schemaType: string): string {
+    switch (schemaType.toLowerCase()) {
+      case 'varchar':
+      case 'text':
+      case 'uuid':
+        return 'VARCHAR';
+      case 'integer':
+      case 'serial':
+        return 'INTEGER';
+      case 'float':
+      case 'real':
+      case 'double precision':
+        return 'FLOAT';
+      case 'boolean':
+        return 'BOOLEAN';
+      case 'date':
+        return 'DATE';
+      case 'timestamp':
+        return 'TIMESTAMP';
+      case 'json':
+      case 'jsonb':
+        return 'JSONB';
+      default:
+        return 'TEXT'; // Default to TEXT for unknown types
+    }
+  }
+
   private async createTableIfNotExists(): Promise<void> {
     try {
       const [result, executionTime] = await measureExecutionTime(async () => {
-        const fields = this.fields;
-        const columns = Object.entries(fields)
-          .map(([name, details]) => {
-            const type = details;
-            return `"${name}" ${type}`;
+        const columns = Object.entries(this.fields)
+          .map(([fieldName, fieldType]) => {
+            let columnDef = `"${fieldName}" ${this.sqlTypeFromSchemaType(
+              fieldType
+            )}`;
+            if (fieldName === 'id') {
+              columnDef += ' PRIMARY KEY';
+            } else if (this.required.includes(fieldName)) {
+              columnDef += ' NOT NULL';
+            } else if (fieldName === 'createdAt' || fieldName === 'updatedAt') {
+              columnDef += ' DEFAULT now()';
+            }
+            return columnDef;
           })
           .join(', ');
 
-        const notNullConstraints = this.required
-          .map((field) => `"${field}" IS NOT NULL`)
-          .join(' AND ');
+        const foreignKeyConstraints = Object.entries(this.relations)
+          .filter(([, relation]) => relation.type === 'belongsTo')
+          .map(([relationName, relation]) => {
+            const foreignKeyField = this.fields[relation.foreignKey];
+            if (!foreignKeyField) {
+              throw new Error(
+                `Foreign key column "${relation.foreignKey}" not defined in fields`
+              );
+            }
 
+            const relatedModelSchema = this.schema[relation.model];
+            if (!relatedModelSchema) {
+              throw new Error(
+                `Related model "${relation.model}" not found in schema`
+              );
+            }
+
+            const relatedModelPrimaryKey = relatedModelSchema.primaryKey;
+            if (!relatedModelPrimaryKey) {
+              throw new Error(
+                `Primary key for related model "${relation.model}" not defined`
+              );
+            }
+
+            let constraint = `, FOREIGN KEY ("${
+              relation.foreignKey
+            }") REFERENCES "${relation.model}" ("${
+              relation.references || relatedModelPrimaryKey
+            }")`;
+            if (relation.onDelete) {
+              constraint += ` ON DELETE ${relation.onDelete}`;
+            }
+            if (relation.onUpdate) {
+              constraint += ` ON UPDATE ${relation.onUpdate}`;
+            }
+            return constraint;
+          })
+          .join('');
+
+        // Create table query
         const createTableQuery = `
         CREATE TABLE IF NOT EXISTS "${this.table}" (
-          ${columns}${
-          notNullConstraints
-            ? `, CONSTRAINT ${this.table}_not_null CHECK (${notNullConstraints})`
-            : ''
-        }
+          ${columns}${foreignKeyConstraints}
         )
       `;
         await this.query(createTableQuery);
       });
-      console.log(`[${this.table}] Create operation took ${executionTime}ms`);
-      return result;
+      console.log(
+        `[${this.table}] Create table operation took ${executionTime}ms`
+      );
     } catch (error) {
       console.error(`[${this.table}] Error creating table:`, error);
       throw new Error(`There was an error creating a new table`);
     }
+  }
+
+  private processFields(data: Partial<ModelData<T>>): Record<string, any> {
+    const processedData: Record<string, any> = {};
+    for (const [field, value] of Object.entries(data)) {
+      const fieldType = this.schema[this.table].fields[field];
+      if (fieldType === 'uuid' && !value) {
+        processedData[field] = uuidv4();
+      } else if (fieldType === 'serial') {
+      } else if (fieldType === 'integer') {
+        processedData[field] = value === undefined ? null : Number(value);
+      } else if (fieldType === 'timestamp' && !value) {
+        processedData[field] = new Date();
+      } else {
+        processedData[field] = value;
+      }
+    }
+    return processedData;
   }
 
   async create(
@@ -74,20 +160,7 @@ export default class QueryBuilder<T extends keyof Schema> {
 
         this.validateData(data, 'create');
 
-        // Process fields
-        const processedData: Record<string, any> = {};
-        for (const [field, value] of Object.entries(data)) {
-          const fieldType = this.schema[this.table].fields[field];
-          if (fieldType === 'uuid' && !value) {
-            processedData[field] = uuidv4(); // Assuming you're using the uuid package
-          } else if (fieldType === 'serial') {
-            // Skip serial fields as they're auto-incremented
-          } else if (fieldType === 'integer') {
-            processedData[field] = value === undefined ? null : Number(value);
-          } else {
-            processedData[field] = value;
-          }
-        }
+        const processedData: Record<string, any> = this.processFields(data);
 
         const keys = Object.keys(processedData);
         const values = Object.values(processedData);
@@ -102,7 +175,6 @@ export default class QueryBuilder<T extends keyof Schema> {
       `;
         const [row] = await this.query(query, values);
 
-        // Handle relations
         if (relations) {
           for (const [relationName, relationData] of Object.entries(
             relations
@@ -280,55 +352,195 @@ export default class QueryBuilder<T extends keyof Schema> {
     try {
       const [result, executionTime] = await measureExecutionTime(async () => {
         this.validatePartialData(data);
-        const keys = Object.keys(data);
-        const values = Object.values(data);
+        const processedData = this.processFields(data);
+        const keys = Object.keys(processedData);
+        const values = Object.values(processedData);
         const setString = keys
           .map((key, index) => `"${key}" = $${index + 1}`)
           .join(', ');
-        const query = `UPDATE "${this.table}" SET ${setString} WHERE id = $${
-          keys.length + 1
-        } RETURNING *`;
+        const query = `
+        UPDATE "${this.table}" 
+        SET ${setString} 
+        WHERE id = $${keys.length + 1} 
+        RETURNING *
+      `;
         const [row] = await this.query(query, [...values, id]);
+
+        if (!row) {
+          throw new Error(`Record with id ${id} not found`);
+        }
+
+        if (data.relations) {
+          for (const [relationName, relationData] of Object.entries(
+            data.relations
+          )) {
+            const relation = this.relations[relationName];
+            if (!relation) {
+              throw new Error(
+                `Relation "${relationName}" not found in schema for "${this.table}"`
+              );
+            }
+            await this.updateRelation(relation, row.id, relationData);
+          }
+        }
+
         return row;
       });
+
       console.log(`[${this.table}] Update operation took ${executionTime}ms`);
       return result;
     } catch (error) {
       console.error(`[${this.table}] Error in update method:`, error);
-      throw new Error(`Error in update method`);
+      throw new Error(`Error in update method: ${(error as Error).message}`);
     }
   }
 
-  async updateMany(
-    where: Partial<ModelData<T>>,
-    data: Partial<ModelData<T>>
-  ): Promise<number> {
-    try {
-      const [result, executionTime] = await measureExecutionTime(async () => {
-        const setKeys = Object.keys(data);
-        const setValues = Object.values(data);
-        const whereKeys = Object.keys(where);
-        const whereValues = Object.values(where);
-        const setString = setKeys
-          .map((key, index) => `"${key}" = $${index + 1}`)
-          .join(', ');
-        const whereString = whereKeys
-          .map((key, index) => `"${key}" = $${setKeys.length + index + 1}`)
-          .join(' AND ');
-        const query = `UPDATE "${this.table}" SET ${setString} WHERE ${whereString}`;
-        const { rowCount } = await this.pool.query(query, [
-          ...setValues,
-          ...whereValues,
-        ]);
-        return rowCount!;
-      });
-      console.log(
-        `[${this.table}] UpdateMany operation took ${executionTime}ms`
+  // async updateMany(
+  //   where: Partial<ModelData<T>>,
+  //   data: Partial<ModelData<T>>
+  // ): Promise<number | null> {
+  //   try {
+  //     const [result, executionTime] = await measureExecutionTime(async () => {
+  //       this.validatePartialData(data);
+  //       const processedData = this.processFields(data);
+  //       const setKeys = Object.keys(processedData);
+  //       const setValues = Object.values(processedData);
+  //       const whereKeys = Object.keys(where);
+  //       const whereValues = Object.values(where);
+  //       const setString = setKeys
+  //         .map((key, index) => `"${key}" = $${index + 1}`)
+  //         .join(', ');
+  //       const whereString = whereKeys
+  //         .map((key, index) => `"${key}" = $${setKeys.length + index + 1}`)
+  //         .join(' AND ');
+  //       const query = `
+  //       UPDATE "${this.table}"
+  //       SET ${setString}
+  //       WHERE ${whereString}
+  //     `;
+  //       const { rowCount } = await this.pool.query(query, [
+  //         ...setValues,
+  //         ...whereValues,
+  //       ]);
+  //       const updatedCount = rowCount ?? 0;
+
+  //       if (this.relations && updatedCount > 0) {
+  //         const updatedRecords = await this.findAll({ where });
+
+  //         // Process relations for each updated record
+  //         for (const record of updatedRecords) {
+  //           for (const [relationName, relationData] of Object.entries(
+  //             this.relations
+  //           )) {
+  //             const relation = this.relations[relationName];
+  //             if (!relation) {
+  //               throw new Error(
+  //                 `Relation "${relationName}" not found in schema for "${this.table}"`
+  //               );
+  //             }
+  //             await this.updateRelation(relation, record.id, relationData);
+  //           }
+  //         }
+  //       }
+
+  //       return updatedCount;
+  //     });
+
+  //     console.log(
+  //       `[${this.table}] UpdateMany operation took ${executionTime}ms`
+  //     );
+  //     return result;
+  //   } catch (error) {
+  //     console.error(`[${this.table}] Error in updateMany method:`, error);
+  //     throw new Error(
+  //       `Error in updateMany method: ${(error as Error).message}`
+  //     );
+  //   }
+  // }
+
+  private async updateRelation(
+    relation: Relation,
+    parentId: any,
+    relationData: any
+  ) {
+    switch (relation.type) {
+      case 'hasOne':
+      case 'hasMany':
+        await this.updateRelatedRecords(relation, parentId, relationData);
+        break;
+      case 'belongsTo':
+        await this.updateForeignKey(relation, parentId, relationData);
+        break;
+      case 'manyToMany':
+        await this.updateManyToManyRelation(relation, parentId, relationData);
+        break;
+      default:
+        throw new Error(`Unsupported relation type: ${relation.type}`);
+    }
+  }
+
+  private async updateRelatedRecords(
+    relation: Relation,
+    parentId: any,
+    data: any[] | any
+  ) {
+    const relatedQueryBuilder = new QueryBuilder(
+      relation.model,
+      this.pool,
+      this.schema
+    );
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        if (item.id) {
+          await relatedQueryBuilder.update(item.id, {
+            ...item,
+            [relation.foreignKey]: parentId,
+          });
+        } else {
+          await relatedQueryBuilder.create({
+            ...item,
+            [relation.foreignKey]: parentId,
+          });
+        }
+      }
+    } else if (data && typeof data === 'object') {
+      if (data.id) {
+        await relatedQueryBuilder.update(data.id, {
+          ...data,
+          [relation.foreignKey]: parentId,
+        });
+      } else {
+        await relatedQueryBuilder.create({
+          ...data,
+          [relation.foreignKey]: parentId,
+        });
+      }
+    }
+  }
+
+  private async updateManyToManyRelation(
+    relation: Relation,
+    sourceId: any,
+    targetIds: any[]
+  ) {
+    if (!relation.junctionTable || !relation.relatedKey) {
+      throw new Error(
+        `Invalid manyToMany relation configuration for "${relation.model}"`
       );
-      return result;
-    } catch (error) {
-      console.error(`[${this.table}] Error in updateMany method:`, error);
-      throw new Error(`Error in updateMany method`);
+    }
+
+    // Remove existing relations
+    await this.query(
+      `DELETE FROM "${relation.junctionTable}" WHERE "${relation.foreignKey}" = $1`,
+      [sourceId]
+    );
+
+    // Add new relations
+    for (const targetId of targetIds) {
+      await this.query(
+        `INSERT INTO "${relation.junctionTable}" ("${relation.foreignKey}", "${relation.relatedKey}") VALUES ($1, $2)`,
+        [sourceId, targetId]
+      );
     }
   }
 
