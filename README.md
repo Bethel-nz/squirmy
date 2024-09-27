@@ -1,6 +1,6 @@
 # Squirmy ORM
 
-Squirmy is a lightweight, schema-based ORM for PostgreSQL, built using Node.js and `pg`. It provides a simple way to interact with your database using TypeScript, offering functionality for creating, reading, updating, and deleting records.
+Squirmy is a lightweight, JSON schema-based ORM for PostgreSQL, built using Node.js and pg. It provides a simple way to interact with your database using TypeScript, offering functionality for creating, reading, updating, and deleting records.
 
 ## Table of Contents
 
@@ -8,223 +8,13 @@ Squirmy is a lightweight, schema-based ORM for PostgreSQL, built using Node.js a
 2. [Usage](#usage)
    - [Initialization](#initialization)
    - [Model Operations](#model-operations)
-     - [Create](#create)
-     - [Read](#read)
-     - [Update](#update)
-     - [Delete](#delete)
-3. [QueryBuilder Class](#querybuilder-class)
-4. [Squirmy Class](#squirmy-class)
+3. [QueryBuilder Methods](#querybuilder-methods)
 
 ## Schema Definition
 
 The schema is defined in a JSON file. Each table is represented by an object with fields, relations, required, and optional properties. Squirmy follows a PostgreSQL JSON-like schema structure.
 
-Example schema (schema/squirmy.json):
-
-```json
-{
-  "User": {
-    "fields": {
-      "id": "uuid",
-      "name": "varchar",
-      "email": "varchar",
-      "password": "varchar",
-      "createdAt": "timestamp",
-      "updatedAt": "timestamp"
-    },
-    "relations": {
-      "posts": {
-        "type": "hasMany",
-        "model": "Post",
-        "foreignKey": "userid",
-        "references": "id"
-      },
-      "profile": {
-        "type": "hasOne",
-        "model": "Profile",
-        "foreignKey": "userid",
-        "references": "id"
-      },
-      "roles": {
-        "type": "manyToMany",
-        "model": "Role",
-        "foreignKey": "userid",
-        "junctionTable": "UserRoles",
-        "relatedKey": "roleId",
-        "references": "id"
-      }
-    },
-    "required": ["id", "name", "email", "password"],
-    "optional": ["createdAt", "updatedAt"],
-    "primaryKey": "id"
-  },
-  "Post": {
-    "fields": {
-      "id": "uuid",
-      "title": "varchar",
-      "content": "text",
-      "userid": "uuid",
-      "createdAt": "timestamp",
-      "updatedAt": "timestamp"
-    },
-    "relations": {
-      "author": {
-        "type": "belongsTo",
-        "model": "User",
-        "foreignKey": "userid",
-        "references": "id"
-      },
-      "comments": {
-        "type": "hasMany",
-        "model": "Comment",
-        "foreignKey": "postId",
-        "references": "id"
-      },
-      "tags": {
-        "type": "manyToMany",
-        "model": "Tag",
-        "foreignKey": "postId",
-        "junctionTable": "PostTags",
-        "relatedKey": "tagId",
-        "references": "id"
-      }
-    },
-    "required": ["id", "title", "content", "userid"],
-    "optional": ["createdAt", "updatedAt"],
-    "primaryKey": "id"
-  },
-  "Profile": {
-    "fields": {
-      "id": "uuid",
-      "userid": "uuid",
-      "bio": "text",
-      "avatarUrl": "varchar"
-    },
-    "relations": {
-      "user": {
-        "type": "belongsTo",
-        "model": "User",
-        "foreignKey": "userid",
-        "references": "id"
-      }
-    },
-    "required": ["id", "userid"],
-    "optional": ["bio", "avatarUrl"],
-    "primaryKey": "id"
-  },
-  "Role": {
-    "fields": {
-      "id": "uuid",
-      "name": "varchar"
-    },
-    "relations": {
-      "users": {
-        "type": "manyToMany",
-        "model": "User",
-        "foreignKey": "roleId",
-        "junctionTable": "UserRoles",
-        "relatedKey": "userid",
-        "references": "id"
-      }
-    },
-    "required": ["id", "name"],
-    "optional": [],
-    "primaryKey": "id"
-  },
-  "Comment": {
-    "fields": {
-      "id": "uuid",
-      "content": "text",
-      "postId": "uuid",
-      "userid": "uuid",
-      "createdAt": "timestamp",
-      "updatedAt": "timestamp"
-    },
-    "relations": {
-      "post": {
-        "type": "belongsTo",
-        "model": "Post",
-        "foreignKey": "postId",
-        "references": "id"
-      },
-      "author": {
-        "type": "belongsTo",
-        "model": "User",
-        "foreignKey": "userid",
-        "references": "id"
-      }
-    },
-    "required": ["id", "content", "postId", "userid"],
-    "optional": ["createdAt", "updatedAt"],
-    "primaryKey": "id"
-  },
-  "Tag": {
-    "fields": {
-      "id": "uuid",
-      "name": "varchar"
-    },
-    "relations": {
-      "posts": {
-        "type": "manyToMany",
-        "model": "Post",
-        "foreignKey": "tagId",
-        "junctionTable": "PostTags",
-        "relatedKey": "postId",
-        "references": "id"
-      }
-    },
-    "required": ["id", "name"],
-    "optional": [],
-    "primaryKey": "id"
-  },
-  "UserRoles": {
-    "fields": {
-      "userid": "uuid",
-      "roleId": "uuid"
-    },
-    "relations": {
-      "user": {
-        "type": "belongsTo",
-        "model": "User",
-        "foreignKey": "userid",
-        "references": "id"
-      },
-      "role": {
-        "type": "belongsTo",
-        "model": "Role",
-        "foreignKey": "roleId",
-        "references": "id"
-      }
-    },
-    "required": ["userid", "roleId"],
-    "optional": [],
-    "primaryKey": ["userid", "roleId"]
-  },
-  "PostTags": {
-    "fields": {
-      "postId": "uuid",
-      "tagId": "uuid"
-    },
-    "relations": {
-      "post": {
-        "type": "belongsTo",
-        "model": "Post",
-        "foreignKey": "postId",
-        "references": "id"
-      },
-      "tag": {
-        "type": "belongsTo",
-        "model": "Tag",
-        "foreignKey": "tagId",
-        "references": "id"
-      }
-    },
-    "required": ["postId", "tagId"],
-    "optional": [],
-    "primaryKey": ["postId", "tagId"]
-  }
-}
-```
+Example schema (schema/squirmy.json): [Here](./src/example/schema/squirmy.json)
 
 ## Usage
 
@@ -233,7 +23,7 @@ Example schema (schema/squirmy.json):
 To use Squirmy, initialize it with a path to your schema file and PostgreSQL connection options.
 
 ```typescript
-import Squirmy from './src/squirmy';
+import Squirmy from 'squirmy';
 
 const squirmy = new Squirmy({
   schemaPath: './schema/squirmy.json',
@@ -249,9 +39,13 @@ const squirmy = new Squirmy({
 
 ### Model Operations
 
-#### Create
+Squirmy provides various methods to interact with your database models. Here's an overview of the available methods and their usage:
 
-To create a new record, use the `create` method.
+## QueryBuilder Methods
+
+### create
+
+Creates a new record in the database.
 
 ```typescript
 const newUser = await squirmy.models.User.create({
@@ -259,275 +53,154 @@ const newUser = await squirmy.models.User.create({
   email: 'john@example.com',
   password: 'hashedpassword',
 });
-console.log('Created User:', newUser);
 ```
 
-#### Read
+### createIndex
 
-To find a record by ID:
+Creates an index on a specified field.
 
 ```typescript
-const userById = await squirmy.models.User.findById(newUser.id);
-console.log('Found User by ID:', userById);
+await squirmy.models.User.createIndex('email', 'BTREE');
 ```
 
-To find a record by criteria:
+### delete
+
+Deletes a record by ID.
 
 ```typescript
-const userByEmail = await squirmy.models.User.findOne({
-  email: 'john@example.com',
+const deletedUser = await squirmy.models.User.delete(1);
+```
+
+### deleteMany
+
+Deletes multiple records based on a condition.
+
+```typescript
+const deletedCount = await squirmy.models.User.deleteMany({
+  status: 'inactive',
 });
-console.log('Found User by Email:', userByEmail);
 ```
 
-To find all records with optional filtering, sorting, and pagination:
+### dropIndex
+
+Drops an index on a specified field.
+
+```typescript
+await squirmy.models.User.dropIndex('email');
+```
+
+### findAll
+
+Retrieves all records matching specified criteria.
 
 ```typescript
 const users = await squirmy.models.User.findAll({
-  where: { name: 'John Doe' },
-  orderBy: 'id DESC',
+  where: { status: 'active' },
+  orderBy: 'createdAt',
   limit: 10,
   offset: 0,
 });
-console.log('Users:', users);
 ```
 
-#### Update
+### findAllWithRelations
 
-To update a record by ID:
+Retrieves all records with their related data.
 
 ```typescript
-const updatedUser = await squirmy.models.User.update(newUser.id, {
-  name: 'Jane Doe',
-});
-console.log('Updated User:', updatedUser);
+const usersWithPosts = await squirmy.models.User.findAllWithRelations(
+  { where: { status: 'active' } },
+  ['posts']
+);
 ```
 
-To update multiple records:
+### findById
+
+Retrieves a record by its ID.
+
+```typescript
+const user = await squirmy.models.User.findById(1);
+```
+
+### findOne
+
+Retrieves the first record matching specified criteria.
+
+```typescript
+const user = await squirmy.models.User.findOne({ email: 'john@example.com' });
+```
+
+### paginate
+
+Retrieves records with pagination.
+
+```typescript
+const paginatedUsers = await squirmy.models.User.paginate(1, 10, {
+  status: 'active',
+});
+```
+
+### query
+
+Executes a raw SQL query.
+
+```typescript
+const results = await squirmy.models.User.query(
+  'SELECT * FROM users WHERE age > $1',
+  [18]
+);
+```
+
+### restore
+
+Restores a soft-deleted record.
+
+```typescript
+const restoredUser = await squirmy.models.User.restore(1);
+```
+
+### softDelete
+
+Marks a record as deleted without removing it from the database.
+
+```typescript
+const softDeletedUser = await squirmy.models.User.softDelete(1);
+```
+
+### update
+
+Updates a record by ID.
+
+```typescript
+const updatedUser = await squirmy.models.User.update(1, { name: 'Jane Doe' });
+```
+
+### updateMany
+
+Updates multiple records based on a condition.
 
 ```typescript
 const updatedCount = await squirmy.models.User.updateMany(
-  { email: 'john@example.com' },
-  { name: 'John Updated' }
+  { status: 'inactive' },
+  { status: 'active' }
 );
-console.log('Updated Multiple Users Count:', updatedCount);
 ```
 
-#### Delete
+### withTransaction
 
-To delete a record by ID:
+Executes multiple database operations within a transaction.
 
 ```typescript
-const deletedUser = await squirmy.models.User.delete(newUser.id);
-console.log('Deleted User:', deletedUser);
-```
-
-To delete multiple records:
-
-````typescript
-const deleteManyCount = await squirmy.models.User.deleteMany({
-  email: 'john@example.com',
+await squirmy.models.User.withTransaction(async (client) => {
+  const newUser = await client.query(
+    'INSERT INTO users (name) VALUES ($1) RETURNING *',
+    ['Alice']
+  );
+  await client.query('INSERT INTO posts (user_id, title) VALUES ($1, $2)', [
+    newUser.rows[0].id,
+    'My First Post',
+  ]);
 });
-console.log('Deleted Multiple Users Count:', deleteManyCount);
-``
-
-`
-
-## QueryBuilder Class
-
-The `QueryBuilder` class provides methods for interacting with a PostgreSQL database using the `pg` library. It abstracts CRUD operations and provides a foundation for working with database models defined in a schema.
-
-### Constructor
-
-```typescript
-constructor(table: T, pool: Pool, schema: Schema)
-````
-
-**Parameters:**
-
-- `table` (T): The name of the table.
-- `pool` (Pool): An instance of the PostgreSQL connection pool.
-- `schema` (Schema): The schema definition for the database.
-
-**Description:**
-Initializes the `QueryBuilder` with the specified table, connection pool, and schema.
-
-### Methods
-
-#### `private async query(sql: string, params: any[] = []): Promise<any[]>`
-
-**Parameters:**
-
-- `sql` (string): The SQL query to execute.
-- `params` (any[]): The parameters for the SQL query.
-
-**Returns:**
-
-- `Promise<any[]>`: The rows returned by the query.
-
-**Description:**
-Executes the given SQL query with the specified parameters.
-
----
-
-#### `private async createTableIfNotExists(): Promise<void>`
-
-**Description:**
-Creates the table if it does not already exist, based on the schema definition.
-
----
-
-#### `async create(data: Partial<T>): Promise<T>`
-
-**Parameters:**
-
-- `data` (Partial<T>): The data to insert into the table.
-
-**Returns:**
-
-- `Promise<T>`: The newly created record.
-
-**Description:**
-Inserts a new record into the table.
-
----
-
-#### `async findAll(options: { where?: WhereClause; orderBy?: string; limit?: number; offset?: number } = {}): Promise<ModelData<T>[]>`
-
-**Parameters:**
-
-- `options` (object):
-  - `where` (WhereClause): Conditions to filter the records.
-  - `orderBy` (string): Field to order the results by.
-  - `limit` (number): Maximum number of records to return.
-  - `offset` (number): Number of records to skip.
-
-**Returns:**
-
-- `Promise<ModelData<T>[]>`: The list of records.
-
-**Description:**
-Retrieves all records that match the specified conditions.
-
----
-
-#### `async findById(id: number): Promise<ModelData<T> | null>`
-
-**Parameters:**
-
-- `id` (number): The ID of the record to find.
-
-**Returns:**
-
-- `Promise<ModelData<T> | null>`: The record, or `null` if not found.
-
-**Description:**
-Finds a record by its ID.
-
----
-
-#### `async findOne(where: WhereClause): Promise<ModelData<T> | null>`
-
-**Parameters:**
-
-- `where` (WhereClause): Conditions to filter the record.
-
-**Returns:**
-
-- `Promise<ModelData<T> | null>`: The record, or `null` if not found.
-
-**Description:**
-Finds a single record that matches the specified conditions.
-
----
-
-#### `async update(id: number, data: Partial<ModelData<T>>): Promise<ModelData<T>>`
-
-**Parameters:**
-
-- `id` (number): The ID of the record to update.
-- `data` (Partial<ModelData<T>>): The data to update.
-
-**Returns:**
-
-- `Promise<ModelData<T>>`: The updated record.
-
-**Description:**
-Updates a record by its ID.
-
----
-
-#### `async updateMany(where: WhereClause, data: Partial<ModelData<T>>): Promise<number>`
-
-**Parameters:**
-
-- `where` (WhereClause): Conditions to filter the records.
-- `data` (Partial<ModelData<T>>): The data to update.
-
-**Returns:**
-
-- `Promise<number>`: The number of records updated.
-
-**Description:**
-Updates multiple records that match the specified conditions.
-
----
-
-#### `async delete(id: number): Promise<ModelData<T> | null>`
-
-**Parameters:**
-
-- `id` (number): The ID of the record to delete.
-
-**Returns:**
-
-- `Promise<ModelData<T> | null>`: The deleted record, or `null` if not found.
-
-**Description:**
-Deletes a record by its ID.
-
----
-
-#### `async deleteMany(where: WhereClause): Promise<number>`
-
-**Parameters:**
-
-- `where` (WhereClause): Conditions to filter the records.
-
-**Returns:**
-
-- `Promise<number>`: The number of records deleted.
-
-**Description:**
-Deletes multiple records that match the specified conditions.
-
----
-
-#### `private validateData(data: Partial<ModelData<T>>): void`
-
-**Parameters:**
-
-- `data` (Partial<ModelData<T>>): The data to validate.
-
-**Description:**
-Validates the provided data against the schema.
-
----
-
-#### `private processFields(data: Partial<ModelData<T>>): Record<string, any>`
-
-**Parameters:**
-
-- `data` (Partial<ModelData<T>>): The data to process.
-
-**Returns:**
-
-- `Record<string, any>`: The processed data.
-
-**Description:**
-Processes and formats the fields according to their types.
-
----
+```
 
 ## Squirmy Class
 
@@ -550,12 +223,12 @@ Initializes Squirmy with the provided schema path and database connection option
 
 ### Methods
 
-#### `async initialize(): Promise<void>`
+#### `async init(): Promise<void>`
 
 **Description:**
 Initializes the ORM by reading the schema and setting up the models.
 
-#### `get models(): Record<string, QueryBuilder<any>>`
+#### `models(): Record<string, QueryBuilder<any>>`
 
 **Returns:**
 
