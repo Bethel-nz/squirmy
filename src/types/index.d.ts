@@ -49,3 +49,18 @@ type Relation = {
 type ModelData<T extends keyof Schema> = {
   [K in keyof Schema[T]['fields']]: InferModelType<T['fields'][K]>;
 };
+
+interface PaginationResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+interface FindAllOptions {
+  where?: Partial<ModelData<any>>;
+  orderBy?: string;
+  limit?: number;
+  offset?: number;
+}
