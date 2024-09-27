@@ -3,8 +3,7 @@ import type { PoolConfig, QueryResult, QueryResultRow } from 'pg';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import QueryBuilder from './QueryBuilder.class';
-import measureExecutionTime from './utils';
+import QueryBuilder from './querybuilder';
 
 export default class Squirmy {
   private pool: Pool;
@@ -12,6 +11,7 @@ export default class Squirmy {
     [K in keyof ModelTypes]: QueryBuilder<K>;
   };
   private schema: Schema;
+  private schemaPath: string;
 
   constructor(options: { schemaPath: string; pool: Pool | PoolConfig }) {
     if (options.pool instanceof Pool) {
@@ -19,16 +19,12 @@ export default class Squirmy {
     } else {
       this.pool = new Pool(options.pool);
     }
-    this.schema = this.loadSchema(options.schemaPath);
+    this.schemaPath = options.schemaPath;
+    this.schema = this.loadSchema(this.schemaPath);
 
     this.models = {} as {
       [K in keyof ModelTypes]: QueryBuilder<K>;
     };
-    measureExecutionTime(async () =>
-      this.generateTypesFromSchema(options.schemaPath)
-    ).then(([_, time]) => {
-      console.log(`Type generation took ${time} ms`);
-    });
 
     this.initializeModels();
   }
@@ -71,11 +67,11 @@ export default class Squirmy {
     return hash.digest('hex');
   }
 
-  private async generateTypesFromSchema(schemaPath: string): Promise<void> {
+  private async generateTypesFromSchema(): Promise<void> {
     console.log('Generating Types from Schema...');
     const types: string[] = [];
-    const typesFilePath = path.join(__dirname, '..', 'types.d.ts');
-    const hashFilePath = path.join(path.dirname(schemaPath), 'schema-hash.txt');
+    const typesFilePath = path.join(process.cwd(), 'squirmy_types.d.ts');
+    const hashFilePath = path.join(process.cwd(), 'squirmy_schema_hash.txt');
 
     let existingContent = '';
     let existingHash = '';
@@ -94,7 +90,6 @@ export default class Squirmy {
       console.log('No changes in schema detected. Types file not updated.');
       return;
     }
-
     for (const [modelName, modelSchema] of Object.entries(this.schema)) {
       const fields = Object.entries(modelSchema.fields)
         .map(
@@ -190,5 +185,11 @@ export default class Squirmy {
       console.error('Error closing the database connection pool:', error);
       throw error;
     }
+  }
+
+  public async init(): Promise<void> {
+    console.log('Initializing Squirmy...');
+    await this.generateTypesFromSchema();
+    console.log('Squirmy initialized successfully.');
   }
 }
